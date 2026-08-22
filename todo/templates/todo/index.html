@@ -1,0 +1,177 @@
+{% extends 'todo/base.html' %}
+{% block content %}
+<div class="row mb-3">
+    <div class="col-md-12 d-flex justify-content-between align-items-center">
+        <h2>Quản lý lịch trình</h2>
+        <div>
+            <button class="btn btn-success me-2" data-bs-toggle="modal" data-bs-target="#taskModal" onclick="resetForm()">+ Tạo lịch mới</button>
+            <button class="btn btn-outline-success" onclick="exportExcel()">Xuất Excel</button>
+        </div>
+    </div>
+</div>
+
+<!-- Bộ lọc -->
+<div class="card p-3 mb-4 shadow-sm">
+    <form id="filterForm" class="row g-2">
+        <div class="col-md-2">
+            <select class="form-select" id="date_filter" name="date_filter">
+                <option value="">-- Chọn thời gian --</option>
+                <option value="current_week">Tuần hiện tại</option>
+            </select>
+        </div>
+        <div class="col-md-2"><input type="date" class="form-control" name="specific_date" id="specific_date"></div>
+        <div class="col-md-2"><input type="number" class="form-control" name="month" placeholder="Tháng (1-12)"></div>
+        <div class="col-md-2"><input type="number" class="form-control" name="year" placeholder="Năm (VD: 2026)"></div>
+        <div class="col-md-2">
+            <select class="form-select" name="status">
+                <option value="">-- Trạng thái --</option>
+                <option value="PLANNED">Đã lên kế hoạch</option>
+                <option value="IN_PROGRESS">Đang làm</option>
+                <option value="COMPLETED">Đã xong</option>
+                <option value="CANCELLED">Đã hủy</option>
+            </select>
+        </div>
+        <div class="col-md-2"><input type="text" class="form-control" name="search" placeholder="Tìm tên/ghi chú..."></div>
+        <div class="col-md-12 text-end mt-2">
+            <button type="button" class="btn btn-primary btn-sm" onclick="loadTasks()">Lọc dữ liệu</button>
+        </div>
+    </form>
+</div>
+
+<!-- Bảng hiển thị danh sách -->
+<table class="table table-bordered bg-white shadow-sm">
+    <thead class="table-dark">
+        <tr>
+            <th>Thời gian</th>
+            <th>Tên công việc</th>
+            <th>Mô tả</th>
+            <th>Ghi chú</th>
+            <th>Trạng thái</th>
+            <th>Thao tác</th>
+        </tr>
+    </thead>
+    <tbody id="taskTableBody"></tbody>
+</table>
+
+<!-- Modal Tạo/Chỉnh sửa -->
+<div class="modal fade" id="taskModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form id="taskForm">
+                {% csrf_token %}
+                <input type="hidden" id="taskId">
+                <div class="modal-header"><h5 class="modal-title" id="modalTitle">Tạo lịch trình</h5></div>
+                <div class="modal-body">
+                    <div class="mb-2"><label>Tên việc (*)</label><input type="text" class="form-control" id="title" required></div>
+                    <div class="mb-2"><label>Mô tả</label><textarea class="form-control" id="description"></textarea></div>
+                    <div class="mb-2"><label>Ghi chú</label><textarea class="form-control" id="note"></textarea></div>
+                    <div class="row">
+                        <div class="col-6 mb-2"><label>Ngày (*)</label><input type="date" class="form-control" id="date" required></div>
+                        <div class="col-6 mb-2"><label>Giờ (*)</label><input type="time" class="form-control" id="time" required></div>
+                    </div>
+                    <div class="mb-2">
+                        <label>Trạng thái</label>
+                        <select class="form-select" id="status">
+                            <option value="PLANNED">Đã lên kế hoạch</option>
+                            <option value="IN_PROGRESS">Đang làm</option>
+                            <option value="COMPLETED">Đã xong</option>
+                            <option value="CANCELLED">Đã hủy</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Đóng</button>
+                    <button type="submit" class="btn btn-primary">Lưu thông tin</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function loadTasks() {
+    const params = new URLSearchParams(new FormData(document.getElementById('filterForm'))).toString();
+    fetch(`/api/tasks/?${params}`)
+        .then(res => res.json())
+        .then(data => {
+            let rows = '';
+            data.tasks.forEach(t => {
+                rows += `<tr>
+                    <td>${t.date} ${t.time}</td>
+                    <td>${t.title} ${t.is_past ? '<span class="badge bg-secondary">Quá khứ</span>' : ''}</td>
+                    <td>${t.description}</td>
+                    <td>${t.note}</td>
+                    <td><span class="badge bg-info">${t.status_display}</span></td>
+                    <td>
+                        <button class="btn btn-sm btn-warning" onclick='editTask(${JSON.stringify(t)})'>Sửa</button>
+                        <button class="btn btn-sm btn-danger" onclick='deleteTask(${t.id})'>Xóa</button>
+                    </td>
+                </tr>`;
+            });
+            document.getElementById('taskTableBody').innerHTML = rows;
+        });
+}
+
+function editTask(t) {
+    document.getElementById('taskId').value = t.id;
+    document.getElementById('note').value = t.note;
+    
+    // Nếu quá khứ: Disable các trường ngoại trừ ghi chú
+    const isPast = t.is_past;
+    document.getElementById('title').value = t.title; document.getElementById('title').disabled = isPast;
+    document.getElementById('description').value = t.description; document.getElementById('description').disabled = isPast;
+    document.getElementById('date').value = t.date; document.getElementById('date').disabled = isPast;
+    document.getElementById('time').value = t.time; document.getElementById('time').disabled = isPast;
+    document.getElementById('status').value = t.status; document.getElementById('status').disabled = isPast;
+
+    new bootstrap.Modal(document.getElementById('taskModal')).show();
+}
+
+document.getElementById('taskForm').onsubmit = function(e) {
+    e.preventDefault();
+    const id = document.getElementById('taskId').value;
+    const url = id ? `/api/tasks/update/${id}/` : '/api/tasks/create/';
+    const formData = new FormData();
+    formData.append('csrfmiddlewaretoken', '{{ csrf_token }}');
+    formData.append('title', document.getElementById('title').value);
+    formData.append('description', document.getElementById('description').value);
+    formData.append('note', document.getElementById('note').value);
+    formData.append('date', document.getElementById('date').value);
+    formData.append('time', document.getElementById('time').value);
+    formData.append('status', document.getElementById('status').value);
+
+    fetch(url, { method: 'POST', body: formData })
+        .then(res => res.json())
+        .then(data => {
+            if (data.error) alert(data.error);
+            else {
+                bootstrap.Modal.getInstance(document.getElementById('taskModal')).hide();
+                loadTasks();
+            }
+        });
+};
+
+function exportExcel() {
+    const params = new URLSearchParams(new FormData(document.getElementById('filterForm'))).toString();
+    window.location.href = `/api/tasks/export/?${params}`;
+}
+
+function resetForm() {
+    document.getElementById('taskForm').reset();
+    document.getElementById('taskId').value = '';
+    ['title', 'description', 'date', 'time', 'status'].forEach(id => document.getElementById(id).disabled = false);
+}
+
+function deleteTask(id) {
+    if (confirm('Bạn có chắc muốn xóa?')) {
+        const formData = new FormData();
+        formData.append('csrfmiddlewaretoken', '{{ csrf_token }}');
+        fetch(`/api/tasks/delete/${id}/`, { method: 'POST', body: formData }).then(() => loadTasks());
+    }
+}
+
+document.addEventListener('DOMContentLoaded', loadTasks);
+</script>
+{% endblock %}
