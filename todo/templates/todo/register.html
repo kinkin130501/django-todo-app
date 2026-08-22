@@ -1,0 +1,28 @@
+{% extends 'todo/base.html' %}
+
+{% block title %}
+  Đăng ký tài khoản
+{% endblock %}
+
+{% block content %}
+  <div class="row justify-content-center">
+    <div class="col-md-5">
+      <div class="card shadow-sm">
+        <div class="card-header bg-primary text-white text-center">
+          <h4 class="card-title mb-0">Đăng ký tài khoản mới</h4>
+        </div>
+        <div class="card-body p-4">
+          <form method="post">
+            {% csrf_token %}
+            {{ form.as_p }}
+            <button type="submit" class="btn btn-primary w-100 mt-2">Đăng ký ngay</button>
+          </form>
+          <hr />
+          <div class="text-center">
+            <small>Đã có tài khoản? <a href="{% url 'login' %}">Đăng nhập</a></small>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+{% endblock %}

@@ -11,17 +11,21 @@ from .models import Task
 
 # Auth Views
 def register_view(request):
+    if request.user.is_authenticated:
+        return redirect('index')
     if request.method == 'POST':
         form = UserCreationForm(request.POST)
         if form.is_valid():
             user = form.save()
-            login(request, user)
+            login(request, user) # Tự động đăng nhập ngay sau khi đăng ký thành công
             return redirect('index')
     else:
         form = UserCreationForm()
     return render(request, 'todo/register.html', {'form': form})
 
 def login_view(request):
+    if request.user.is_authenticated:
+        return redirect('index')
     if request.method == 'POST':
         form = AuthenticationForm(data=request.POST)
         if form.is_valid():
